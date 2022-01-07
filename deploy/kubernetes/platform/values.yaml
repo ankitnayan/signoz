@@ -7,9 +7,16 @@ query-service:
     ClickHouseUrl: http://signoz-clickhouse:9000?username=clickhouse_operator&password=clickhouse_operator_password
     STORAGE: clickhouse
 
+frontend:
+  service:
+    type: LoadBalancer
+
 cloud: aws
 
 clickhouseOperator:
   enabled: true
-  storage: 20Gi
-  serviceType: ClusterIP
+  storage: 200Gi
+  serviceType: LoadBalancer
+
+otelCollector:
+  replicas: 5
