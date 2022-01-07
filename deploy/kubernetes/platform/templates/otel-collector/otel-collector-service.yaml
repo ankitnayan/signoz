@@ -31,3 +31,4 @@ spec:
     port: 8889
   selector:
     component: otel-collector
+  type: LoadBalancer
