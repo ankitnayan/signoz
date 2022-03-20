@@ -1,9 +1,10 @@
 package clickhouseReader
 
 import (
+	"context"
 	"time"
 
-	"github.com/jmoiron/sqlx"
+	"github.com/ClickHouse/clickhouse-go/v2"
 )
 
 type Encoding string
@@ -16,13 +17,14 @@ const (
 )
 
 const (
-	defaultDatasource        string        = "tcp://localhost:9000"
-	defaultOperationsTable   string        = "signoz_operations"
-	defaultIndexTable        string        = "signoz_index"
-	defaultErrorTable        string        = "signoz_error_index"
-	defaultWriteBatchDelay   time.Duration = 5 * time.Second
-	defaultWriteBatchSize    int           = 10000
-	defaultEncoding          Encoding      = EncodingJSON
+	defaultDatasource      string        = "tcp://localhost:9000"
+	defaultOperationsTable string        = "signoz_operations"
+	defaultIndexTable      string        = "signoz_index_v2"
+	defaultErrorTable      string        = "signoz_error_index"
+	defaultSpansTable      string        = "signoz_spans"
+	defaultWriteBatchDelay time.Duration = 5 * time.Second
+	defaultWriteBatchSize  int           = 10000
+	defaultEncoding        Encoding      = EncodingJSON
 )
 
 const (
@@ -52,15 +54,28 @@ type namespaceConfig struct {
 }
 
 // Connecto defines how to connect to the database
-type Connector func(cfg *namespaceConfig) (*sqlx.DB, error)
+type Connector func(cfg *namespaceConfig) (clickhouse.Conn, error)
 
-func defaultConnector(cfg *namespaceConfig) (*sqlx.DB, error) {
-	db, err := sqlx.Open("clickhouse", cfg.Datasource)
+func defaultConnector(cfg *namespaceConfig) (clickhouse.Conn, error) {
+	ctx := context.Background()
+	db, err := clickhouse.Open(&clickhouse.Options{
+		Addr: []string{"127.0.0.1:9000"},
+		Auth: clickhouse.Auth{
+			Database: "default",
+			Username: "default",
+			Password: "",
+		},
+		//Debug:           true,
+		DialTimeout:     time.Second,
+		MaxOpenConns:    10,
+		MaxIdleConns:    5,
+		ConnMaxLifetime: time.Hour,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	if err := db.Ping(); err != nil {
+	if err := db.Ping(ctx); err != nil {
 		return nil, err
 	}
 
@@ -89,6 +104,7 @@ func NewOptions(datasource string, primaryNamespace string, otherNamespaces ...s
 			OperationsTable: defaultOperationsTable,
 			IndexTable:      defaultIndexTable,
 			ErrorTable:      defaultErrorTable,
+			SpansTable:      defaultSpansTable,
 			WriteBatchDelay: defaultWriteBatchDelay,
 			WriteBatchSize:  defaultWriteBatchSize,
 			Encoding:        defaultEncoding,
